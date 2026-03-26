@@ -10,9 +10,13 @@
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
   const SUPABASE_URL = "https://ecyklezuaezyjwutwfzt.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjeWtsZXp1YWV6eWp3dXR3Znp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Mjg3MDUsImV4cCI6MjA5MDEwNDcwNX0.O_JObhgX92JSfQanCWOUObHgH-r06U9iWH9rkIHddjM";
+  const REQUEST_TIMEOUT_MS = 8000;
 
   const sendBooking = async ({ name, phone, service }) => {
     const endpoint = `${SUPABASE_URL}/rest/v1/bookings`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
@@ -21,8 +25,10 @@
         "Content-Type": "application/json",
         Prefer: "return=minimal",
       },
+      signal: controller.signal,
       body: JSON.stringify([{ name, phone, service }]),
     });
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       throw new Error(`Supabase error: ${response.status}`);
@@ -129,6 +135,12 @@
   if (bookForm) {
     bookForm.addEventListener("submit", async (e) => {
       e.preventDefault();
+      const submitBtn = bookForm.querySelector('button[type="submit"]');
+      const initialBtnText = submitBtn ? submitBtn.textContent : "";
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Отправка...";
+      }
 
       const data = new FormData(bookForm);
       const name = String(data.get("name") || "");
@@ -141,7 +153,12 @@
         closeModal();
         bookForm.reset();
       } catch {
-        alert("Не удалось отправить заявку. Попробуйте еще раз.");
+        alert("Не удалось отправить заявку (тайм-аут/сеть). Попробуйте еще раз.");
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = initialBtnText || "Отправить заявку";
+        }
       }
     });
   }
