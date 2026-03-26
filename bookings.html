@@ -53,11 +53,7 @@
 
       <div class="bookings-card">
         <div class="bookings-actions">
-          <button class="btn btn-primary" type="button" id="exportBtn">Скачать файл заявок (JSON)</button>
-          <button class="btn btn-ghost" type="button" id="importBtn">Импортировать JSON-файл</button>
-          <button class="btn btn-ghost" type="button" id="clearBtn">Очистить локальные заявки</button>
-          <a class="btn btn-ghost" href="https://swiftkeyjack19-debug.github.io/NataliaMarchenko/">Назад на сайт</a>
-          <input class="file-input" id="fileInput" type="file" accept=".json,application/json" />
+          <button class="btn btn-primary" type="button" id="refreshBtn">Обновить журнал</button>
         </div>
 
         <p class="bookings-empty" id="emptyState">Заявок пока нет.</p>
@@ -80,13 +76,12 @@
     </div>
   </main>
 
+  <script src="config.js"></script>
   <script>
     (() => {
+      const API_URL = typeof window.BOOKINGS_API_URL === "string" ? window.BOOKINGS_API_URL.trim() : "";
       const KEY = "beautyStudioBookings";
-      const exportBtn = document.getElementById("exportBtn");
-      const importBtn = document.getElementById("importBtn");
-      const clearBtn = document.getElementById("clearBtn");
-      const fileInput = document.getElementById("fileInput");
+      const refreshBtn = document.getElementById("refreshBtn");
       const table = document.getElementById("bookingsTable");
       const body = document.getElementById("bookingsBody");
       const emptyState = document.getElementById("emptyState");
@@ -102,24 +97,21 @@
         }
       };
 
-      const save = (rows) => {
+      const saveLocal = (rows) => {
         localStorage.setItem(KEY, JSON.stringify(rows, null, 2));
       };
 
-      const download = (rows) => {
-        const blob = new Blob([JSON.stringify(rows, null, 2)], { type: "application/json;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "bookings-data.json";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
+      const fetchRemote = async () => {
+        if (!API_URL) return load();
+        const response = await fetch(`${API_URL}?mode=list`, { method: "GET" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        const rows = Array.isArray(data.bookings) ? data.bookings : [];
+        saveLocal(rows);
+        return rows;
       };
 
-      const render = () => {
-        const rows = load();
+      const render = (rows) => {
         body.innerHTML = "";
 
         if (!rows.length) {
@@ -144,39 +136,18 @@
         emptyState.hidden = true;
       };
 
-      exportBtn.addEventListener("click", () => {
-        const rows = load();
-        download(rows);
-      });
-
-      importBtn.addEventListener("click", () => fileInput.click());
-      fileInput.addEventListener("change", async () => {
-        const file = fileInput.files && fileInput.files[0];
-        if (!file) return;
+      const refresh = async () => {
         try {
-          const text = await file.text();
-          const parsed = JSON.parse(text);
-          if (!Array.isArray(parsed)) {
-            alert("Файл должен содержать массив заявок.");
-            return;
-          }
-          save(parsed);
-          render();
-          alert("Заявки импортированы.");
+          const rows = await fetchRemote();
+          render(rows);
         } catch {
-          alert("Не удалось прочитать файл. Проверьте формат JSON.");
-        } finally {
-          fileInput.value = "";
+          const rows = load();
+          render(rows);
         }
-      });
+      };
 
-      clearBtn.addEventListener("click", () => {
-        if (!confirm("Очистить локальные заявки в этом браузере?")) return;
-        save([]);
-        render();
-      });
-
-      render();
+      refreshBtn.addEventListener("click", refresh);
+      refresh();
     })();
   </script>
 </body>

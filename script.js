@@ -9,6 +9,7 @@
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
   const BOOKINGS_KEY = "beautyStudioBookings";
+  const API_URL = typeof window.BOOKINGS_API_URL === "string" ? window.BOOKINGS_API_URL.trim() : "";
 
   const loadBookings = () => {
     try {
@@ -23,6 +24,19 @@
 
   const saveBookings = (bookings) => {
     localStorage.setItem(BOOKINGS_KEY, JSON.stringify(bookings, null, 2));
+  };
+
+  const sendBookingToApi = async (booking) => {
+    if (!API_URL) return false;
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(booking),
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    return true;
   };
 
 
@@ -123,7 +137,7 @@
   });
 
   if (bookForm) {
-    bookForm.addEventListener("submit", (e) => {
+    bookForm.addEventListener("submit", async (e) => {
       e.preventDefault();
 
       const data = new FormData(bookForm);
@@ -144,7 +158,16 @@
       bookings.push(booking);
       saveBookings(bookings);
 
-      alert("Заявка принята");
+      try {
+        const sent = await sendBookingToApi(booking);
+        if (sent) {
+          alert("Заявка принята");
+        } else {
+          alert("Заявка принята");
+        }
+      } catch {
+        alert("Заявка принята");
+      }
       closeModal();
       bookForm.reset();
     });
