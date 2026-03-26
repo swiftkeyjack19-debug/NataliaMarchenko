@@ -48,16 +48,12 @@
       <div class="section-head">
         <p class="section-eyebrow">Админ</p>
         <h2>Журнал заявок</h2>
-        <p class="muted">Файл журнала: <code>bookings.json</code>. Ниже можно подтянуть локальные заявки, импортировать/экспортировать файл.</p>
+        <p class="muted">Общий журнал заявок из базы данных.</p>
       </div>
 
       <div class="bookings-card">
         <div class="bookings-actions">
           <button class="btn btn-primary" type="button" id="refreshBtn">Обновить журнал</button>
-          <button class="btn btn-ghost" type="button" id="exportBtn">Скачать bookings.json</button>
-          <button class="btn btn-ghost" type="button" id="importBtn">Импортировать JSON-файл</button>
-          <button class="btn btn-ghost" type="button" id="clearBtn">Очистить локальные заявки</button>
-          <input class="file-input" id="fileInput" type="file" accept=".json,application/json" />
         </div>
 
         <p class="bookings-empty" id="emptyState">Заявок пока нет.</p>
@@ -82,61 +78,32 @@
 
   <script>
     (() => {
-      const KEY = "beautyStudioBookings";
+      const SUPABASE_URL = "https://ecyklezuaezyjwutwfzt.supabase.co";
+      const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjeWtsZXp1YWV6eWp3dXR3Znp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Mjg3MDUsImV4cCI6MjA5MDEwNDcwNX0.O_JObhgX92JSfQanCWOUObHgH-r06U9iWH9rkIHddjM";
       const refreshBtn = document.getElementById("refreshBtn");
-      const exportBtn = document.getElementById("exportBtn");
-      const importBtn = document.getElementById("importBtn");
-      const clearBtn = document.getElementById("clearBtn");
-      const fileInput = document.getElementById("fileInput");
       const table = document.getElementById("bookingsTable");
       const body = document.getElementById("bookingsBody");
       const emptyState = document.getElementById("emptyState");
 
-      const load = () => {
-        try {
-          const raw = localStorage.getItem(KEY);
-          if (!raw) return [];
-          const parsed = JSON.parse(raw);
-          return Array.isArray(parsed) ? parsed : [];
-        } catch {
-          return [];
-        }
-      };
+      const fetchBookings = async () => {
+        const endpoint =
+          `${SUPABASE_URL}/rest/v1/bookings` +
+          "?select=id,created_at,name,phone,service&order=created_at.desc";
 
-      const saveLocal = (rows) => {
-        localStorage.setItem(KEY, JSON.stringify(rows, null, 2));
-      };
-
-      const download = (rows) => {
-        const blob = new Blob([JSON.stringify(rows, null, 2)], { type: "application/json;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "bookings.json";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-      };
-
-      const uniqueById = (rows) => {
-        const map = new Map();
-        rows.forEach((r) => {
-          const id = String(r.id || `${r.createdAt || ""}_${r.phone || ""}_${r.name || ""}`);
-          map.set(id, r);
+        const response = await fetch(endpoint, {
+          method: "GET",
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          },
         });
-        return Array.from(map.values());
-      };
 
-      const fetchFileBookings = async () => {
-        try {
-          const response = await fetch("bookings.json", { cache: "no-store" });
-          if (!response.ok) return [];
-          const data = await response.json();
-          return Array.isArray(data) ? data : [];
-        } catch {
-          return [];
+        if (!response.ok) {
+          throw new Error(`Supabase error: ${response.status}`);
         }
+
+        const rows = await response.json();
+        return Array.isArray(rows) ? rows : [];
       };
 
       const render = (rows) => {
@@ -152,7 +119,7 @@
           const tr = document.createElement("tr");
           tr.innerHTML = `
             <td>${idx + 1}</td>
-            <td>${row.createdAtLocal || "-"}</td>
+            <td>${row.created_at ? new Date(row.created_at).toLocaleString("ru-RU") : "-"}</td>
             <td>${row.name || "-"}</td>
             <td>${row.phone || "-"}</td>
             <td>${row.service || "-"}</td>
@@ -165,45 +132,14 @@
       };
 
       const refresh = async () => {
-        const fileRows = await fetchFileBookings();
-        const localRows = load();
-        const rows = uniqueById([...fileRows, ...localRows]);
-        saveLocal(rows);
-        render(rows);
-      };
-
-      exportBtn.addEventListener("click", () => {
-        const rows = load();
-        download(rows);
-      });
-
-      importBtn.addEventListener("click", () => fileInput.click());
-      fileInput.addEventListener("change", async () => {
-        const file = fileInput.files && fileInput.files[0];
-        if (!file) return;
         try {
-          const text = await file.text();
-          const parsed = JSON.parse(text);
-          if (!Array.isArray(parsed)) {
-            alert("Файл должен содержать массив заявок.");
-            return;
-          }
-          const rows = uniqueById([...load(), ...parsed]);
-          saveLocal(rows);
+          const rows = await fetchBookings();
           render(rows);
-          alert("Файл заявок импортирован.");
         } catch {
-          alert("Не удалось прочитать файл. Проверьте формат JSON.");
-        } finally {
-          fileInput.value = "";
+          render([]);
+          alert("Не удалось загрузить заявки из базы.");
         }
-      });
-
-      clearBtn.addEventListener("click", () => {
-        if (!confirm("Очистить локальные заявки в этом браузере?")) return;
-        saveLocal([]);
-        refresh();
-      });
+      };
 
       refreshBtn.addEventListener("click", refresh);
       refresh();

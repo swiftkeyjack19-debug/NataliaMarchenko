@@ -8,21 +8,25 @@
 (() => {
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
-  const BOOKINGS_KEY = "beautyStudioBookings";
+  const SUPABASE_URL = "https://ecyklezuaezyjwutwfzt.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjeWtsZXp1YWV6eWp3dXR3Znp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Mjg3MDUsImV4cCI6MjA5MDEwNDcwNX0.O_JObhgX92JSfQanCWOUObHgH-r06U9iWH9rkIHddjM";
 
-  const loadBookings = () => {
-    try {
-      const raw = localStorage.getItem(BOOKINGS_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
+  const sendBooking = async ({ name, phone, service }) => {
+    const endpoint = `${SUPABASE_URL}/rest/v1/bookings`;
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify([{ name, phone, service }]),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Supabase error: ${response.status}`);
     }
-  };
-
-  const saveBookings = (bookings) => {
-    localStorage.setItem(BOOKINGS_KEY, JSON.stringify(bookings, null, 2));
   };
 
 
@@ -123,7 +127,7 @@
   });
 
   if (bookForm) {
-    bookForm.addEventListener("submit", (e) => {
+    bookForm.addEventListener("submit", async (e) => {
       e.preventDefault();
 
       const data = new FormData(bookForm);
@@ -131,21 +135,14 @@
       const phone = String(data.get("phone") || "");
       const service = String(data.get("service") || "");
 
-      const booking = {
-        id: Date.now(),
-        createdAt: new Date().toISOString(),
-        createdAtLocal: new Date().toLocaleString("ru-RU"),
-        name,
-        phone,
-        service,
-      };
-
-      const bookings = loadBookings();
-      bookings.push(booking);
-      saveBookings(bookings);
-      alert("Заявка принята");
-      closeModal();
-      bookForm.reset();
+      try {
+        await sendBooking({ name, phone, service });
+        alert("Заявка принята");
+        closeModal();
+        bookForm.reset();
+      } catch {
+        alert("Не удалось отправить заявку. Попробуйте еще раз.");
+      }
     });
   }
 })();
