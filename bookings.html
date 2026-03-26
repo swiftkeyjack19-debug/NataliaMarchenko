@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Журнал заявок</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .bookings-wrap { padding: 40px 0 70px; }
+    .bookings-card {
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.04);
+      box-shadow: 0 14px 40px rgba(0,0,0,.28);
+      padding: 16px;
+    }
+    .bookings-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 0 0 16px;
+    }
+    .bookings-table-wrap { overflow: auto; }
+    .bookings-table {
+      width: 100%;
+      min-width: 760px;
+      border-collapse: collapse;
+    }
+    .bookings-table th, .bookings-table td {
+      border-bottom: 1px solid rgba(255,255,255,.10);
+      padding: 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .bookings-table th { color: rgba(255,255,255,.75); font-size: 13px; }
+    .bookings-table td { color: rgba(255,255,255,.92); }
+    .bookings-empty {
+      margin: 0;
+      color: rgba(255,255,255,.72);
+      padding: 10px 2px;
+    }
+    .file-input { display: none; }
+  </style>
+</head>
+<body>
+  <main class="bookings-wrap">
+    <div class="container">
+      <div class="section-head">
+        <p class="section-eyebrow">Админ</p>
+        <h2>Журнал заявок</h2>
+        <p class="muted">Можно смотреть локальные заявки, экспортировать файл и импортировать файл от другого пользователя.</p>
+      </div>
+
+      <div class="bookings-card">
+        <div class="bookings-actions">
+          <button class="btn btn-primary" type="button" id="exportBtn">Скачать файл заявок (JSON)</button>
+          <button class="btn btn-ghost" type="button" id="importBtn">Импортировать JSON-файл</button>
+          <button class="btn btn-ghost" type="button" id="clearBtn">Очистить локальные заявки</button>
+          <a class="btn btn-ghost" href="https://swiftkeyjack19-debug.github.io/NataliaMarchenko/">Назад на сайт</a>
+          <input class="file-input" id="fileInput" type="file" accept=".json,application/json" />
+        </div>
+
+        <p class="bookings-empty" id="emptyState">Заявок пока нет.</p>
+
+        <div class="bookings-table-wrap">
+          <table class="bookings-table" id="bookingsTable" hidden>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Дата</th>
+                <th>Имя</th>
+                <th>Телефон</th>
+                <th>Услуга</th>
+              </tr>
+            </thead>
+            <tbody id="bookingsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    (() => {
+      const KEY = "beautyStudioBookings";
+      const exportBtn = document.getElementById("exportBtn");
+      const importBtn = document.getElementById("importBtn");
+      const clearBtn = document.getElementById("clearBtn");
+      const fileInput = document.getElementById("fileInput");
+      const table = document.getElementById("bookingsTable");
+      const body = document.getElementById("bookingsBody");
+      const emptyState = document.getElementById("emptyState");
+
+      const load = () => {
+        try {
+          const raw = localStorage.getItem(KEY);
+          if (!raw) return [];
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      };
+
+      const save = (rows) => {
+        localStorage.setItem(KEY, JSON.stringify(rows, null, 2));
+      };
+
+      const download = (rows) => {
+        const blob = new Blob([JSON.stringify(rows, null, 2)], { type: "application/json;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "bookings-data.json";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      };
+
+      const render = () => {
+        const rows = load();
+        body.innerHTML = "";
+
+        if (!rows.length) {
+          table.hidden = true;
+          emptyState.hidden = false;
+          return;
+        }
+
+        rows.forEach((row, idx) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${idx + 1}</td>
+            <td>${row.createdAtLocal || "-"}</td>
+            <td>${row.name || "-"}</td>
+            <td>${row.phone || "-"}</td>
+            <td>${row.service || "-"}</td>
+          `;
+          body.appendChild(tr);
+        });
+
+        table.hidden = false;
+        emptyState.hidden = true;
+      };
+
+      exportBtn.addEventListener("click", () => {
+        const rows = load();
+        download(rows);
+      });
+
+      importBtn.addEventListener("click", () => fileInput.click());
+      fileInput.addEventListener("change", async () => {
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const parsed = JSON.parse(text);
+          if (!Array.isArray(parsed)) {
+            alert("Файл должен содержать массив заявок.");
+            return;
+          }
+          save(parsed);
+          render();
+          alert("Заявки импортированы.");
+        } catch {
+          alert("Не удалось прочитать файл. Проверьте формат JSON.");
+        } finally {
+          fileInput.value = "";
+        }
+      });
+
+      clearBtn.addEventListener("click", () => {
+        if (!confirm("Очистить локальные заявки в этом браузере?")) return;
+        save([]);
+        render();
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>
+

@@ -2,12 +2,41 @@
    - раскрытие мобильного меню
    - появление блоков при прокрутке (IntersectionObserver)
    - кнопка "Наверх"
-   - простая модалка записи (демо)
+   - простая модалка записи
 */
 
 (() => {
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+  const BOOKINGS_KEY = "beautyStudioBookings";
+
+  const loadBookings = () => {
+    try {
+      const raw = localStorage.getItem(BOOKINGS_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const saveBookings = (bookings) => {
+    localStorage.setItem(BOOKINGS_KEY, JSON.stringify(bookings, null, 2));
+  };
+
+  const downloadBookingsFile = (bookings) => {
+    const content = JSON.stringify(bookings, null, 2);
+    const blob = new Blob([content], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "bookings-data.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
 
   // Year
   const yearEl = $("#year");
@@ -114,8 +143,21 @@
       const phone = String(data.get("phone") || "");
       const service = String(data.get("service") || "");
 
-      // Демонстрация: показываем сообщение вместо отправки на сервер
-      alert(`Заявка принята (демо):\nИмя: ${name}\nТелефон: ${phone}\nУслуга: ${service}`);
+      const booking = {
+        id: Date.now(),
+        createdAt: new Date().toISOString(),
+        createdAtLocal: new Date().toLocaleString("ru-RU"),
+        name,
+        phone,
+        service,
+      };
+
+      const bookings = loadBookings();
+      bookings.push(booking);
+      saveBookings(bookings);
+      downloadBookingsFile(bookings);
+
+      alert("Заявка сохранена. Файл bookings-data.json скачан — его можно передать администратору.");
       closeModal();
       bookForm.reset();
     });
