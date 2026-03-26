@@ -25,18 +25,6 @@
     localStorage.setItem(BOOKINGS_KEY, JSON.stringify(bookings, null, 2));
   };
 
-  const downloadBookingsFile = (bookings) => {
-    const content = JSON.stringify(bookings, null, 2);
-    const blob = new Blob([content], { type: "application/json;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "bookings-data.json";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  };
 
   // Year
   const yearEl = $("#year");
@@ -155,9 +143,8 @@
       const bookings = loadBookings();
       bookings.push(booking);
       saveBookings(bookings);
-      downloadBookingsFile(bookings);
 
-      alert("Заявка сохранена. Файл bookings-data.json скачан — его можно передать администратору.");
+      alert("Заявка принята");
       closeModal();
       bookForm.reset();
     });
